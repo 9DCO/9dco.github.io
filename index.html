@@ -27,7 +27,7 @@
     input[type="password"],
     input[type="datetime-local"],
     textarea{
-      width:100%; font-size:16px;  /* ← iOS自動ズーム回避 */
+      width:100%!important; font-size:16px;
       padding:14px 12px; margin-top:6px; margin-bottom:14px;
       border:1px solid #cfcfcf; border-radius:10px; background:#fff; min-height:46px;
       box-shadow: inset 0 1px 0 rgba(0,0,0,0.02);
@@ -49,7 +49,7 @@ input[type="datetime-local"]:not(:invalid)::-webkit-datetime-edit{
 /* 右端アイコン分の余白だけ確保（ピッカーは表示のまま） */
 input[type="datetime-local"]{
   box-sizing: border-box;
-  padding-right: 44px;
+  padding-right: inherit;
   background:#fff;
 }
 /* クリアやスピンは隠してOK（任意） */
