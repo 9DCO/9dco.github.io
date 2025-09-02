@@ -2,148 +2,184 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8">
-  <!-- iOSの入力フォーカス時ズーム抑止に使うので id を付与 -->
+  <!-- iOSの入力ズーム対策で動的に書き換えるので id を付与 -->
   <meta name="viewport" id="vp" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>ヒヤリ・ハット報告（GitHub Pages）</title>
   <style>
     *,*::before,*::after{ box-sizing:border-box; }
     html{ -webkit-text-size-adjust:100%; }
-    body{ margin:0; font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans JP",Arial,sans-serif;
-          background:#f4f4f4; color:#222; line-height:1.65; padding:18px; }
-    .container{ max-width:680px; margin:0 auto; background:#fff; border-radius:14px;
-                box-shadow:0 2px 14px rgba(0,0,0,.08); padding:18px; }
-    h1{ text-align:center; margin:0 0 12px; font-size:24px; color:#333; }
-    h2{ margin:24px 0 10px; font-size:18px; color:#555; }
-    label{ display:block; font-weight:700; margin-top:10px; }
-    input[type="text"], input[type="password"], input[type="datetime-local"], textarea{
-      width:100%; font-size:16px; padding:14px 12px; margin-top:6px; margin-bottom:14px;
+    body{
+      margin:0; padding:18px;
+      font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans JP",Arial,sans-serif;
+      line-height:1.65; color:#222; background:#f4f4f4;
+    }
+
+    .container{
+      max-width: 720px; margin: 0 auto; background:#fff; border-radius:14px;
+      box-shadow:0 2px 14px rgba(0,0,0,.08); padding: 20px;
+    }
+
+    h1{ margin:0 0 14px; text-align:center; font-size:28px; color:#333; }
+    h2{ margin:26px 0 10px; font-size:18px; color:#555; }
+    label{ display:block; margin-top:10px; font-weight:700; }
+
+    input[type="text"],
+    input[type="password"],
+    input[type="datetime-local"],
+    textarea{
+      width:100%; font-size:16px;  /* ← iOS自動ズーム回避 */
+      padding:14px 12px; margin-top:6px; margin-bottom:14px;
       border:1px solid #cfcfcf; border-radius:10px; background:#fff; min-height:46px;
+      box-shadow: inset 0 1px 0 rgba(0,0,0,0.02);
     }
     textarea{ resize:vertical; min-height:140px; }
-    .radio-group{ display:flex; flex-wrap:wrap; gap:10px 18px; margin:6px 0 12px; }
-    .radio-group label{ display:inline-flex; align-items:center; gap:8px; margin:0; font-weight:600; }
-    .radio-group input[type="radio"]{ transform:scale(1.2); }
-    input[type="submit"]{
-      width:100%; background:#4CAF50; color:#fff; font-weight:700; font-size:16px;
-      border:0; border-radius:12px; padding:16px 18px; cursor:pointer; min-height:48px;
-      touch-action:manipulation;
+    input:focus, textarea:focus{ outline:2px solid #76c68a; outline-offset:2px; }
+
+    /* datetime-local の右端を他の input と揃える（iOS/Android） */
+    input[type="datetime-local"]{
+      -webkit-appearance:none; appearance:none; padding-right:12px; background:#fff;
     }
-    input[type="submit"]:hover{ background:#45a049; }
-    #status{ margin-top:12px; font-weight:700; text-align:center; word-break:break-word; }
-    .hidden{ display:none; }
-    .required::after{ content:" *"; color:#e11; }
-    /* datetime-local の右端を他と揃える（iOS/Android兼用） */
-    input[type="datetime-local"]{ -webkit-appearance:none; appearance:none; padding-right:12px; }
     input[type="datetime-local"]::-webkit-calendar-picker-indicator,
     input[type="datetime-local"]::-webkit-clear-button,
     input[type="datetime-local"]::-webkit-inner-spin-button{ display:none; }
+
+    .radio-group{ display:flex; flex-wrap:wrap; gap:10px 18px; margin:6px 0 12px; }
+    .radio-group label{ display:inline-flex; align-items:center; gap:8px; margin:0; font-weight:600; }
+    .radio-group input[type="radio"]{ transform:scale(1.2); }
+
+    .btn{
+      display:inline-block; width:100%;
+      background:#4CAF50; color:#fff; font-weight:700; font-size:16px;
+      border:0; border-radius:12px; padding:16px 18px; cursor:pointer; min-height:48px;
+      text-align:center; text-decoration:none; user-select:none; touch-action:manipulation;
+    }
+    .btn:hover{ background:#45a049; }
+
+    #status{ margin-top:12px; font-weight:700; text-align:center; word-break:break-word; }
+    .required::after{ content:" *"; color:#e11; }
+    .hidden{ display:none; }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>ヒヤリ・ハット報告</h1>
 
-    <form id="reportForm">
-      <h2>アクセス認証</h2>
-      <label for="password" class="required">パスワード</label>
-      <input type="password" id="password" name="password" required autocomplete="current-password">
+    <form id="reportForm" autocomplete="on">
+      <!-- ① パスワードゲート（初期表示） -->
+      <section id="gate">
+        <h2>アクセス認証</h2>
+        <label for="password" class="required">パスワード</label>
+        <input type="password" id="password" name="password" required autocomplete="current-password" inputmode="text">
+        <button id="authBtn" type="button" class="btn" style="margin-top:6px">認証してフォームを表示</button>
+      </section>
 
-      <h2>基本事項</h2>
-      <label for="eventDate" class="required">発生日</label>
-      <input type="datetime-local" id="eventDate" name="eventDate" required>
+      <!-- ② 認証OK後に開くフォーム本体 -->
+      <div id="formFields" class="hidden">
+        <h2>基本事項</h2>
+        <label for="eventDate" class="required">発生日</label>
+        <input type="datetime-local" id="eventDate" name="eventDate" required>
 
-      <label for="userName" class="required">利用者名</label>
-      <input type="text" id="userName" name="userName" required>
+        <label for="userName" class="required">利用者名</label>
+        <input type="text" id="userName" name="userName" required>
 
-      <label>要介護度 (要介護の場合)</label>
-      <div class="radio-group">
-        <label><input type="radio" name="kaigoLevel" value="1">1</label>
-        <label><input type="radio" name="kaigoLevel" value="2">2</label>
-        <label><input type="radio" name="kaigoLevel" value="3">3</label>
-        <label><input type="radio" name="kaigoLevel" value="4">4</label>
-        <label><input type="radio" name="kaigoLevel" value="5">5</label>
+        <label>要介護度 (要介護の場合)</label>
+        <div class="radio-group">
+          <label><input type="radio" name="kaigoLevel" value="1">1</label>
+          <label><input type="radio" name="kaigoLevel" value="2">2</label>
+          <label><input type="radio" name="kaigoLevel" value="3">3</label>
+          <label><input type="radio" name="kaigoLevel" value="4">4</label>
+          <label><input type="radio" name="kaigoLevel" value="5">5</label>
+        </div>
+
+        <label>要介護度 (要支援の場合)</label>
+        <div class="radio-group">
+          <label><input type="radio" name="shienLevel" value="1">1</label>
+          <label><input type="radio" name="shienLevel" value="2">2</label>
+        </div>
+
+        <label>障害支援区分</label>
+        <div class="radio-group">
+          <label><input type="radio" name="shienClass" value="1">1</label>
+          <label><input type="radio" name="shienClass" value="2">2</label>
+          <label><input type="radio" name="shienClass" value="3">3</label>
+          <label><input type="radio" name="shienClass" value="4">4</label>
+          <label><input type="radio" name="shienClass" value="5">5</label>
+          <label><input type="radio" name="shienClass" value="6">6</label>
+        </div>
+
+        <label class="required">発生場所</label>
+        <div class="radio-group">
+          <label><input type="radio" name="location" value="利用者宅" required>利用者宅</label>
+          <label><input type="radio" name="location" value="その他" required>その他</label>
+        </div>
+
+        <div id="otherLocationContainer" class="hidden">
+          <label for="otherLocation">利用者宅以外の発生場所</label>
+          <input type="text" id="otherLocation" name="otherLocation">
+        </div>
+
+        <label for="reporterName" class="required">報告者名</label>
+        <input type="text" id="reporterName" name="reporterName" required>
+
+        <h2>ヒヤリ・ハットした状況の説明</h2>
+        <label for="situation" class="required">状況</label>
+        <textarea id="situation" name="situation" placeholder="いつ・どこで・どんな風に" required></textarea>
+
+        <label for="response" class="required">どのように対応したか</label>
+        <textarea id="response" name="response" required></textarea>
+
+        <h2>関係各所への報告・連絡</h2>
+        <label for="careManagerReportDate">相談者、ケアマネージャーはいつ報告・連絡しましたか</label>
+        <input type="text" id="careManagerReportDate" name="careManagerReportDate">
+
+        <label for="careManagerReportWho">相談者、ケアマネージャーは誰に報告・連絡しましたか</label>
+        <input type="text" id="careManagerReportWho" name="careManagerReportWho">
+
+        <label for="familyReportDate">ご家族様等はいつ報告・連絡しましたか</label>
+        <input type="text" id="familyReportDate" name="familyReportDate">
+
+        <label for="familyReportWho">ご家族様等は誰に報告・連絡しましたか</label>
+        <input type="text" id="familyReportWho" name="familyReportWho">
+
+        <h2>放置することで今後発生が懸念される事故やトラブル</h2>
+        <label for="potentialTrouble" class="required">放置することで今後発生が懸念される事故やトラブル</label>
+        <textarea id="potentialTrouble" name="potentialTrouble" required></textarea>
+
+        <h2>今後の対策</h2>
+        <label for="futureMeasures" class="required">今後の対策を記入してください</label>
+        <textarea id="futureMeasures" name="futureMeasures" required></textarea>
+
+        <input id="submitBtn" class="btn" type="submit" value="送信" style="margin-top:6px">
       </div>
-
-      <label>要介護度 (要支援の場合)</label>
-      <div class="radio-group">
-        <label><input type="radio" name="shienLevel" value="1">1</label>
-        <label><input type="radio" name="shienLevel" value="2">2</label>
-      </div>
-
-      <label>障害支援区分</label>
-      <div class="radio-group">
-        <label><input type="radio" name="shienClass" value="1">1</label>
-        <label><input type="radio" name="shienClass" value="2">2</label>
-        <label><input type="radio" name="shienClass" value="3">3</label>
-        <label><input type="radio" name="shienClass" value="4">4</label>
-        <label><input type="radio" name="shienClass" value="5">5</label>
-        <label><input type="radio" name="shienClass" value="6">6</label>
-      </div>
-
-      <label class="required">発生場所</label>
-      <div class="radio-group">
-        <label><input type="radio" name="location" value="利用者宅" required>利用者宅</label>
-        <label><input type="radio" name="location" value="その他" required>その他</label>
-      </div>
-
-      <div id="otherLocationContainer" class="hidden">
-        <label for="otherLocation">利用者宅以外の発生場所</label>
-        <input type="text" id="otherLocation" name="otherLocation">
-      </div>
-
-      <label for="reporterName" class="required">報告者名</label>
-      <input type="text" id="reporterName" name="reporterName" required>
-
-      <h2>ヒヤリ・ハットした状況の説明</h2>
-      <label for="situation" class="required">状況</label>
-      <textarea id="situation" name="situation" required placeholder="いつ・どこで・どんな風に"></textarea>
-
-      <label for="response" class="required">どのように対応したか</label>
-      <textarea id="response" name="response" required></textarea>
-
-      <h2>関係各所への報告・連絡</h2>
-      <label for="careManagerReportDate">相談者、ケアマネージャーはいつ報告・連絡しましたか</label>
-      <input type="text" id="careManagerReportDate" name="careManagerReportDate">
-
-      <label for="careManagerReportWho">相談者、ケアマネージャーは誰に報告・連絡しましたか</label>
-      <input type="text" id="careManagerReportWho" name="careManagerReportWho">
-
-      <label for="familyReportDate">ご家族様等はいつ報告・連絡しましたか</label>
-      <input type="text" id="familyReportDate" name="familyReportDate">
-
-      <label for="familyReportWho">ご家族様等は誰に報告・連絡しましたか</label>
-      <input type="text" id="familyReportWho" name="familyReportWho">
-
-      <h2>放置することで今後発生が懸念される事故やトラブル</h2>
-      <label for="potentialTrouble" class="required">放置することで今後発生が懸念される事故やトラブル</label>
-      <textarea id="potentialTrouble" name="potentialTrouble" required></textarea>
-
-      <h2>今後の対策</h2>
-      <label for="futureMeasures" class="required">今後の対策を記入してください</label>
-      <textarea id="futureMeasures" name="futureMeasures" required></textarea>
-
-      <input type="submit" value="送信">
     </form>
 
     <div id="status"></div>
   </div>
 
   <script>
-    // iOSのフォーカス時ズーム抑止（入力時だけ maximum-scale=1）
+    const GAS_EXEC_URL = 'https://script.google.com/macros/s/AKfycbzS47CaHI3OwVM_cHUx1N8eJWn_HRCzEIPfIMe_DFQXJ0r6HsgxItQPnLE1RxJ0XWU/exec';
+
+    const gate = document.getElementById('gate');
+    const fields = document.getElementById('formFields');
+    const submitBtn = document.getElementById('submitBtn');
+    const statusEl = document.getElementById('status');
+    const otherLocationContainer = document.getElementById('otherLocationContainer');
+    let authedPassword = '';
+
+    // iOS のフォーカス時ズーム抑止（入力中のみ maximum-scale=1）
     (function(){
       const vp = document.querySelector('meta[name="viewport"]');
       if(!vp) return;
       const base = 'width=device-width, initial-scale=1, viewport-fit=cover';
       const lock   = () => vp.setAttribute('content', base + ', maximum-scale=1, user-scalable=no');
       const unlock = () => vp.setAttribute('content', base + ', maximum-scale=10');
-      document.addEventListener('focusin', e => { if (e.target.matches('input,textarea,select')) lock(); });
+      document.addEventListener('focusin',  e => { if (e.target.matches('input,textarea,select')) lock(); });
       document.addEventListener('focusout', e => { if (e.target.matches('input,textarea,select')) unlock(); });
     })();
 
-    // 「その他」選択時の補助欄表示
-    const otherLocationContainer = document.getElementById('otherLocationContainer');
+    // 「その他」選択で補助フィールド表示
     document.querySelectorAll('input[name="location"]').forEach(radio => {
-      radio.addEventListener('change', (e) => {
+      radio.addEventListener('change', e => {
         if (e.target.value === 'その他') {
           otherLocationContainer.classList.remove('hidden');
           document.getElementById('otherLocation').setAttribute('required', 'required');
@@ -154,46 +190,72 @@
       });
     });
 
-    // 要介護/要支援の相互排他（片方選んだらもう片方をクリア）
+    // 要介護/要支援を相互排他に
     const kaigoRadios = Array.from(document.querySelectorAll('input[name="kaigoLevel"]'));
     const shienRadios = Array.from(document.querySelectorAll('input[name="shienLevel"]'));
-    function clearGroup(radios){ radios.forEach(r => r.checked = false); }
+    function clearGroup(rs){ rs.forEach(r => r.checked = false); }
     kaigoRadios.forEach(r => r.addEventListener('change', () => { if (r.checked) clearGroup(shienRadios); }));
     shienRadios.forEach(r => r.addEventListener('change', () => { if (r.checked) clearGroup(kaigoRadios); }));
 
-    // ====== 送信処理 ======
-    const GAS_EXEC_URL = 'https://script.google.com/macros/s/XXXXXXXXXXXXXXXXXXXXXXXX/exec'; // ←差し替え
-
-    document.getElementById('reportForm').addEventListener('submit', async (ev) => {
-      ev.preventDefault();
-      const status = document.getElementById('status');
-      status.style.color = '#2a7'; status.textContent = '送信中…';
-
-      // form → JSON
-      const fd = new FormData(ev.target);
-      const data = {};
-      for (const [k,v] of fd.entries()) data[k] = v;
+    // ① 認証だけ（action:'auth'）
+    document.getElementById('authBtn').addEventListener('click', async () => {
+      const pw = document.getElementById('password').value.trim();
+      if (!pw) { statusEl.textContent = 'パスワードを入力してください。'; statusEl.style.color = '#c0392b'; return; }
+      statusEl.textContent = '認証中…'; statusEl.style.color = '#2a7';
 
       try {
         const res = await fetch(GAS_EXEC_URL, {
           method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, // ←プリフライト回避
-          body: JSON.stringify(data),
+          headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, // プリフライト回避
+          body: JSON.stringify({ action:'auth', password: pw })
         });
+        const json = await res.json();
+        if (json.ok) {
+          authedPassword = pw;                 // 保持
+          gate.classList.add('hidden');        // パスワード欄を隠す
+          fields.classList.remove('hidden');   // 本フォームを表示
+          statusEl.textContent = '';
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else {
+          statusEl.textContent = '認証に失敗しました。'; statusEl.style.color = '#c0392b';
+        }
+      } catch (e) {
+        statusEl.textContent = '通信エラー：' + (e.message || e); statusEl.style.color = '#c0392b';
+      }
+    });
 
-        const json = await res.json().catch(() => ({}));
-        if (json && json.ok) {
-          status.style.color = '#2a7';
-          status.innerHTML = '報告が送信されました。PDF: <a href="'+ json.url +'" target="_blank" rel="noopener">開く</a>';
+    // ② 送信（保持したパスワード同封）
+    document.getElementById('reportForm').addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      if (!authedPassword) {
+        statusEl.textContent = '先に認証してください。'; statusEl.style.color = '#c0392b';
+        return;
+      }
+      statusEl.textContent = '送信中…'; statusEl.style.color = '#2a7';
+
+      const fd = new FormData(ev.target);
+      const data = {};
+      for (const [k,v] of fd.entries()) data[k] = v;
+      data.password = authedPassword;   // サーバ側で再検証
+
+      try {
+        const res = await fetch(GAS_EXEC_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+          body: JSON.stringify(data)
+        });
+        const json = await res.json();
+        if (json.ok) {
+          statusEl.innerHTML = '送信完了。PDF: <a href="'+json.url+'" target="_blank" rel="noopener">開く</a>';
           ev.target.reset();
           otherLocationContainer.classList.add('hidden');
+          // 再入力させたいなら以下を有効化：
+          // fields.classList.add('hidden'); gate.classList.remove('hidden'); authedPassword='';
         } else {
-          status.style.color = '#c0392b';
-          status.textContent = 'エラー: ' + (json.error || 'サーバーエラー');
+          statusEl.textContent = 'エラー: ' + (json.error || 'サーバーエラー'); statusEl.style.color = '#c0392b';
         }
-      } catch (err) {
-        status.style.color = '#c0392b';
-        status.textContent = '通信エラー: ' + (err && err.message || err);
+      } catch (e) {
+        statusEl.textContent = '通信エラー：' + (e.message || e); statusEl.style.color = '#c0392b';
       }
     });
   </script>
