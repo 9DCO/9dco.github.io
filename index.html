@@ -83,6 +83,43 @@ input[type="datetime-local"]::-webkit-inner-spin-button{
     #status{ margin-top:12px; font-weight:700; text-align:center; word-break:break-word; }
     .required::after{ content:" *"; color:#e11; }
     .hidden{ display:none; }
+/* 日時入力：右端アイコンを隠して自前ボタンに置換（はみ出しゼロ） */
+.dt-wrap{
+  position: relative;
+}
+.dt-wrap input[type="datetime-local"]{
+  display:block;
+  width:100%;
+  max-width:100%;
+  box-sizing:border-box;
+  padding-right: 44px;         /* ボタン分の余白 */
+  background:#fff;
+  overflow:hidden;             /* はみ出しをクリップ */
+}
+/* 既定アイコン/スピン/クリアは非表示 */
+.dt-wrap input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+.dt-wrap input[type="datetime-local"]::-webkit-inner-spin-button,
+.dt-wrap input[type="datetime-local"]::-webkit-clear-button{
+  display:none;
+}
+
+/* 自前のカレンダーボタン */
+.dt-wrap .dt-btn{
+  position:absolute;
+  right:8px; top:50%; transform:translateY(-50%);
+  width:28px; height:28px;
+  border:0; border-radius:6px;
+  background:#f1f1f1 no-repeat center/18px 18px;
+  cursor:pointer;
+}
+/* アイコン（インラインSVG） */
+.dt-wrap .dt-btn{
+  background-image:url('data:image/svg+xml;utf8,\
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="%23666">\
+  <path d="M7 2v2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2H7zm12 6H5v10h14V8z"/>\
+  </svg>');
+}
+.dt-wrap .dt-btn:active{ filter:brightness(0.95); }    
   </style>
 </head>
 <body>
@@ -102,7 +139,10 @@ input[type="datetime-local"]::-webkit-inner-spin-button{
       <div id="formFields" class="hidden">
         <h2>基本事項</h2>
         <label for="eventDate" class="required">発生日</label>
-        <input type="datetime-local" id="eventDate" name="eventDate" required>
+        <div class="dt-wrap">
+          <input type="datetime-local" id="eventDate" name="eventDate" required>
+          <button type="button" class="dt-btn" aria-label="日時を選択"></button>
+        </div>
 
         <label for="userName" class="required">利用者名</label>
         <input type="text" id="userName" name="userName" required>
@@ -284,26 +324,29 @@ input[type="datetime-local"]::-webkit-inner-spin-button{
       }
     });
   </script>
-  <script>
-  // 空のときにクリック/フォーカスで即ピッカーを開く
+<script>
+  // 日時ピッカー：入力欄タップ/フォーカス & 右側ボタンで常に開く
   (function(){
-    const dt = document.getElementById('eventDate');
+    const dt  = document.getElementById('eventDate');
+    const btn = document.querySelector('.dt-wrap .dt-btn'); // 追加した自前ボタン
     if (!dt) return;
 
     function openPicker(){
-      // 対応ブラウザではネイティブピッカーを明示的に開く
       if (typeof dt.showPicker === 'function') {
-        try { dt.showPicker(); } catch(_) {}
+        try { dt.showPicker(); return; } catch(_) {}
       }
-      // showPicker非対応でも、フォーカスすれば大抵はOSピッカーが出ます
+      // showPicker 非対応（古いiOSなど）はフォーカスで代替
+      dt.focus();
     }
 
-    // “空で required”のときだけトリガ
-    function shouldOpen(){ return dt.required && !dt.value; }
+    // 入力欄：タップ/フォーカス時に常に開く（値が入っていても再編集できる）
+    dt.addEventListener('click', openPicker);
+    dt.addEventListener('focus', openPicker);
 
-    dt.addEventListener('focus', () => { if (shouldOpen()) openPicker(); });
-    dt.addEventListener('click', () => { if (shouldOpen()) openPicker(); });
+    // 右端ボタン：タップで開く
+    if (btn) btn.addEventListener('click', openPicker);
   })();
 </script>
+
 </body>
 </html>
