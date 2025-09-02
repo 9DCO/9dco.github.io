@@ -265,7 +265,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator{
         });
         const json = await res.json();
         if (json.ok) {
-          statusEl.innerHTML = '送信完了。PDF: <a href="'+json.url+'" target="_blank" rel="noopener">開く</a>';
+          statusEl.innerHTML = '送信完了';
           ev.target.reset();
           otherLocationContainer.classList.add('hidden');
           // 再入力させたいなら以下を有効化：
