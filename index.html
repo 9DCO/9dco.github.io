@@ -19,7 +19,7 @@
       box-shadow:0 2px 14px rgba(0,0,0,.08); padding: 20px;
     }
 
-    h1{ margin:0 0 14px; text-align:center; font-size:28px; color:#333; }
+    h1{ margin:0 0 14px; text-align:center; font-size:25px; color:#333; }
     h2 {margin: 26px 0 10px;font-size: 16px;color: #000;padding: 5px 12px;line-height: 1.5;background-color: bisque;}
     label{ display:block; margin-top:10px; font-weight:700; }
 
@@ -49,17 +49,23 @@ input[type="datetime-local"]:not(:invalid)::-webkit-datetime-edit{
 /* 右端アイコン分の余白だけ確保（ピッカーは表示のまま） */
 input[type="datetime-local"]{
   box-sizing: border-box;
-  padding-right: inherit;
-  background:#fff;
-}
-/* クリアやスピンは隠してOK（任意） */
-input[type="datetime-local"]::-webkit-clear-button,
-input[type="datetime-local"]::-webkit-inner-spin-button{ display:none; }
-/* アイコンを少し内側に（任意） */
+  width: 100%;
+  max-width: 100%;
+  padding-right: 44px;        /* アイコン分の余白だけ確保 */
+  background: #fff;
+  background-clip: padding-box;
+  overflow: hidden;           /* ← はみ出しをクリップ（これが効きます） */
+}    
+/* アイコン側で外側へ押し出さないようにマージンをリセット */
 input[type="datetime-local"]::-webkit-calendar-picker-indicator{
-  padding:6px; margin-right:6px;
+  margin: 0;                  /* ← 以前の margin-right があれば上書き */
+  padding: 8px;               /* クリック領域は確保 */
 }
-
+/* クリア/スピンは非表示でもOK（任意） */
+input[type="datetime-local"]::-webkit-clear-button,
+input[type="datetime-local"]::-webkit-inner-spin-button{
+  display: none;
+}
 
 
     .radio-group{ display:flex; flex-wrap:wrap; gap:10px 18px; margin:6px 0 12px; }
