@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" id="vp" content="width=device-width, initial-scale=1">
+<title>管理画面｜PDF報告アプリ</title>
+<!-- Font Awesome（必要なら外してOK） -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+  *,*::before,*::after{ box-sizing:border-box; }
+  body{ margin:0; padding:20px; background:#f5f7fa; color:#222;
+        font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans JP",sans-serif; }
+  .wrap{ max-width:900px; margin:0 auto; background:#fff; border-radius:14px;
+         box-shadow:0 2px 14px rgba(0,0,0,.08); padding:20px; }
+  h1{ margin:0 0 12px; font-size:24px; text-align:center; }
+  h2{ margin:18px 0 8px; font-size:18px; color:#444; }
+  label{ font-weight:700; display:block; margin-top:8px; }
+  input[type="password"], input[type="text"], select{
+    width:100%; padding:12px; border:1px solid #cfcfcf; border-radius:10px; font-size:16px; margin-top:6px;
+  }
+  .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
+  .btn{ background:#2563eb; color:#fff; border:0; border-radius:10px; padding:12px 16px;
+        font-weight:700; cursor:pointer; font-size:16px; }
+  .btn.secondary{ background:#10b981; }
+  .btn.warn{ background:#ef4444; }
+  .btn.ghost{ background:#fff; color:#ef4444; border:1px solid #ef4444; }
+  .icon-btn{ display:inline-flex; align-items:center; gap:6px; }
+  .card{ border:1px solid #e5e7eb; border-radius:12px; padding:14px; margin-top:14px; }
+  #status{ margin-top:12px; font-weight:700; text-align:center; }
+  table{ width:100%; border-collapse:collapse; font-size:14px; }
+  th,td{ padding:8px; border-bottom:1px solid #eee; text-align:left; }
+  .hidden{ display:none; }
+  .muted{ color:#6b7280; font-size:12px; }
+
+  /* Progress bar */
+  .bar{ position:relative; width:100%; height:18px; background:#eef2f7; border-radius:9px; overflow:hidden; }
+  .bar>span{ position:absolute; left:0; top:0; bottom:0; width:0%; background:#2563eb; }
+
+  /* Toggle */
+  .toggle{ display:inline-flex; align-items:center; gap:8px; cursor:pointer; }
+  .toggle input{ display:none; }
+  .tgl{
+    width:46px; height:26px; background:#e5e7eb; border-radius:13px; position:relative; transition:.2s;
+  }
+  .tgl::after{
+    content:""; position:absolute; width:22px; height:22px; background:#fff; border-radius:50%;
+    left:2px; top:2px; transition:.2s; box-shadow:0 1px 3px rgba(0,0,0,.15);
+  }
+  .toggle input:checked + .tgl{ background:#10b981; }
+  .toggle input:checked + .tgl::after{ transform:translateX(20px); }
+
+  /* Modal */
+  .modal{ position:fixed; inset:0; display:none; place-items:center; background:rgba(0,0,0,.4); z-index:50; }
+  .modal.show{ display:grid; }
+  .modal .box{ width:min(520px, 92vw); background:#fff; border-radius:12px; padding:18px; box-shadow:0 10px 30px rgba(0,0,0,.2); }
+  .modal .box h3{ margin:0 0 10px; font-size:18px; }
+  .modal .box .actions{ display:flex; gap:10px; justify-content:flex-end; margin-top:12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>管理画面｜PDF報告アプリ</h1>
+
+  <!-- ログイン -->
+  <section id="login">
+    <h2>ログイン</h2>
+    <label for="adminPw">管理用パスワード</label>
+    <input type="password" id="adminPw" placeholder="管理パスワードを入力">
+    <div style="margin-top:10px">
+      <button class="btn" id="loginBtn">ログイン</button>
+    </div>
+    <div id="loginMsg" style="margin-top:8px;color:#ef4444;"></div>
+  </section>
+
+  <!-- パネル -->
+  <section id="panel" class="hidden">
+
+    <!-- 使用量 -->
+    <div class="card">
+      <h2>Googleドライブ使用状況</h2>
+      <div id="usageMsg" class="muted" style="margin-bottom:8px;">取得中…</div>
+      <div class="bar"><span id="usageBar"></span></div>
+      <div id="usageText" style="margin-top:6px;"></div>
+      <button class="btn secondary" id="refreshUsageBtn" style="margin-top:10px;">最新の使用量を取得</button>
+    </div>
+
+    <!-- 通知設定 -->
+    <div class="card">
+      <h2>通知メール</h2>
+      <div class="row">
+        <label class="toggle" title="PDF生成時の通知メールをON/OFF">
+          <input type="checkbox" id="notifyToggle">
+          <span class="tgl"></span> <span id="notifyStateText">OFF</span>
+        </label>
+      </div>
+      <div class="row" style="margin-top:8px;">
+        <div style="flex:1 1 300px;">
+          <label for="notifyEmail">通知先メールアドレス</label>
+          <input type="text" id="notifyEmail" placeholder="例）alert@example.com">
+        </div>
+        <div>
+          <button class="btn" id="saveNotifyEmailBtn">宛先を保存</button>
+        </div>
+      </div>
+      <p class="muted" style="margin-top:6px;">※ 通知は「ON」かつ宛先が設定されている場合のみ送信されます。</p>
+    </div>
+
+    <!-- ダウンロード：履歴CSV -->
+    <div class="card">
+      <h2>ダウンロード：回答履歴（CSV）</h2>
+      <button class="btn secondary" id="dlCsvBtn">回答履歴CSVをダウンロード</button>
+    </div>
+
+    <!-- ダウンロード／削除：PDF（月） -->
+    <div class="card">
+      <h2>PDF（月別）</h2>
+      <div class="row">
+        <div style="flex:1 1 240px;">
+          <label for="monthSel">月を選択（YYYY_MM）</label>
+          <select id="monthSel"></select>
+          <div class="muted" id="monthInfo"></div>
+        </div>
+        <div><button class="btn secondary" id="refreshMonthsBtn">月一覧を更新</button></div>
+        <div><button class="btn" id="zipBtn">ZIP作成＆ダウンロード</button></div>
+        <div><button class="btn ghost icon-btn" id="delMonthBtn" title="この月のフォルダを削除（ゴミ箱へ）">
+          <i class="fa-solid fa-trash"></i> 削除
+        </button></div>
+      </div>
+
+      <div id="filesWrap" class="hidden">
+        <h3 style="margin-top:12px">この月のPDF一覧</h3>
+        <table id="filesTbl">
+          <thead><tr><th>ファイル名</th><th>サイズ</th><th>更新日時</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="muted">※ 削除は「ゴミ箱へ移動」です（Drive から復元可能）。完全削除は Drive 側で行ってください。</p>
+    </div>
+
+    <!-- パスワード変更 -->
+    <div class="card">
+      <h2>パスワード変更</h2>
+      <div class="row">
+        <div style="flex:1 1 280px;">
+          <label for="newPw">入力用（ACCESS_PASSWORD）</label>
+          <input type="text" id="newPw" placeholder="6〜128文字">
+        </div>
+        <div><button class="btn warn" id="setPwBtn">変更する</button></div>
+      </div>
+      <div class="row" style="margin-top:10px;">
+        <div style="flex:1 1 220px;">
+          <label for="currAdminPw">現在の管理パスワード</label>
+          <input type="password" id="currAdminPw">
+        </div>
+        <div style="flex:1 1 220px;">
+          <label for="newAdminPw">新しい管理パスワード</label>
+          <input type="password" id="newAdminPw" placeholder="10〜128文字">
+        </div>
+        <div><button class="btn warn" id="setAdminPwBtn">変更する</button></div>
+      </div>
+    </div>
+
+    <div id="status"></div>
+  </section>
+</div>
+
+<!-- 確認ダイアログ（モーダル） -->
+<div class="modal" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+  <div class="box">
+    <h3 id="confirmTitle">フォルダを削除しますか？</h3>
+    <div id="confirmBody" class="muted">
+      選択した月のフォルダと中のファイルは <b>Googleドライブのゴミ箱</b> に移動します。<br>
+      復元は可能ですが、完全削除すると元に戻せません。
+    </div>
+    <div class="actions">
+      <button class="btn" id="cancelDelBtn">キャンセル</button>
+      <button class="btn warn" id="confirmDelBtn">削除する</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const GAS_EXEC_URL = 'https://script.google.com/macros/s/XXXXXXXXXXXXXXXXXXXX/exec'; // ←差し替え
+
+  let adminPassword = '';
+  const statusEl = document.getElementById('status');
+  const loginSec = document.getElementById('login');
+  const panelSec = document.getElementById('panel');
+
+  const usageBar  = document.getElementById('usageBar');
+  const usageMsg  = document.getElementById('usageMsg');
+  const usageText = document.getElementById('usageText');
+
+  const notifyToggle = document.getElementById('notifyToggle');
+  const notifyStateText = document.getElementById('notifyStateText');
+  const notifyEmail = document.getElementById('notifyEmail');
+
+  const confirmModal = document.getElementById('confirmModal');
+  const confirmTitle = document.getElementById('confirmTitle');
+  const confirmBody  = document.getElementById('confirmBody');
+  const confirmDelBtn = document.getElementById('confirmDelBtn');
+  const cancelDelBtn  = document.getElementById('cancelDelBtn');
+
+  function setStatus(msg, ok=true){ statusEl.style.color = ok ? '#0a7f5a' : '#b91c1c'; statusEl.textContent = msg || ''; }
+
+  async function postJSON(bodyObj){
+    const res = await fetch(GAS_EXEC_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+      body: JSON.stringify(bodyObj)
+    });
+    const json = await res.json().catch(() => ({}));
+    return json;
+  }
+
+  // ログイン
+  document.getElementById('loginBtn').addEventListener('click', async () => {
+    const pw = document.getElementById('adminPw').value.trim();
+    if (!pw) { document.getElementById('loginMsg').textContent = 'パスワードを入力してください。'; return; }
+    document.getElementById('loginMsg').textContent = '認証中…';
+    const json = await postJSON({ action:'admin_auth', adminPassword: pw });
+    if (json && json.ok) {
+      adminPassword = pw;
+      loginSec.classList.add('hidden');
+      panelSec.classList.remove('hidden');
+      setStatus('ログインしました。', true);
+      await initDashboard();
+    } else {
+      document.getElementById('loginMsg').textContent = '認証に失敗しました。';
+    }
+  });
+
+  async function initDashboard(){
+    await refreshUsage();
+    await loadSettings();
+    await refreshMonths();
+  }
+
+  /* ===== 使用量 ===== */
+  document.getElementById('refreshUsageBtn').addEventListener('click', refreshUsage);
+  async function refreshUsage(){
+    usageMsg.textContent = '取得中…';
+    usageBar.style.width = '0%';
+    usageText.textContent = '';
+    const json = await postJSON({ action:'get_drive_usage', adminPassword });
+    if (json && json.ok) {
+      const limit = Number(json.limit || 0);
+      const used  = Number(json.usage || 0);
+      let percent = 0;
+      if (limit > 0) percent = Math.min(100, Math.round(used / limit * 100));
+      usageBar.style.width = (limit>0 ? percent : 0) + '%';
+      usageMsg.textContent = limit>0 ? `合計 ${prettyBytes(limit)} 中` : '合計：無制限/不明（プラン依存）';
+      usageText.textContent = `使用量：${prettyBytes(used)}（${limit>0 ? percent + '%' : '割合表示なし'}）`;
+    } else {
+      usageMsg.textContent = '使用量を取得できませんでした。GAS側で Drive API を有効にしてください。';
+      usageText.textContent = json && json.error ? json.error : '';
+    }
+  }
+
+  /* ===== 通知設定 ===== */
+  async function loadSettings(){
+    const json = await postJSON({ action:'get_admin_settings', adminPassword });
+    if (json && json.ok) {
+      notifyToggle.checked = !!json.notifyEnabled;
+      notifyStateText.textContent = notifyToggle.checked ? 'ON' : 'OFF';
+      notifyEmail.value = json.notificationEmail || '';
+    }
+  }
+  notifyToggle.addEventListener('change', async () => {
+    const json = await postJSON({ action:'set_notify_enabled', adminPassword, enabled: notifyToggle.checked });
+    if (json && json.ok) {
+      notifyStateText.textContent = json.enabled ? 'ON' : 'OFF';
+      setStatus('通知設定を更新しました。', true);
+    } else {
+      setStatus('通知設定の更新に失敗しました。', false);
+    }
+  });
+  document.getElementById('saveNotifyEmailBtn').addEventListener('click', async () => {
+    const email = notifyEmail.value.trim();
+    const json = await postJSON({ action:'set_notification_email', adminPassword, email });
+    if (json && json.ok) setStatus('通知先メールアドレスを保存しました。', true);
+    else setStatus('メールアドレスの保存に失敗しました。形式をご確認ください。', false);
+  });
+
+  /* ===== 履歴CSV ===== */
+  document.getElementById('dlCsvBtn').addEventListener('click', async () => {
+    setStatus('ダウンロードURLを発行しています…', true);
+    const json = await postJSON({ action:'issue_history_download', adminPassword });
+    if (json && json.ok && json.token) {
+      setStatus('');
+      const url = GAS_EXEC_URL + '?action=download_history&token=' + encodeURIComponent(json.token);
+      window.location.href = url;
+    } else {
+      setStatus('ダウンロードの発行に失敗しました。', false);
+    }
+  });
+
+  /* ===== 月別PDF ===== */
+  document.getElementById('refreshMonthsBtn').addEventListener('click', refreshMonths);
+  async function refreshMonths(){
+    setStatus('月一覧を取得中…', true);
+    const json = await postJSON({ action:'list_pdf_months', adminPassword });
+    const sel = document.getElementById('monthSel');
+    sel.innerHTML = '';
+    if (json && json.ok && Array.isArray(json.months)) {
+      json.months.forEach(m => {
+        const opt = document.createElement('option'); opt.value = m; opt.textContent = m; sel.appendChild(opt);
+      });
+      setStatus('', true);
+      document.getElementById('filesWrap').classList.add('hidden');
+      document.getElementById('monthInfo').textContent = json.months.length ? '利用可能な月：' + json.months.length + '件' : '月フォルダがありません';
+      if (json.months.length) await loadFilesForMonth(sel.value);
+    } else {
+      setStatus('月一覧の取得に失敗しました。', false);
+    }
+  }
+
+  document.getElementById('monthSel').addEventListener('change', async (e) => {
+    await loadFilesForMonth(e.target.value);
+  });
+
+  async function loadFilesForMonth(ym){
+    if (!ym) return;
+    setStatus('ファイル一覧を取得中…', true);
+    const json = await postJSON({ action:'list_pdf_files', adminPassword, ym });
+    const tbody = document.querySelector('#filesTbl tbody'); tbody.innerHTML = '';
+    if (json && json.ok && Array.isArray(json.files)) {
+      json.files.forEach(f => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${escapeHtml(f.name)}</td><td>${prettyBytes(f.size)}</td><td>${f.updated}</td>`;
+        tbody.appendChild(tr);
+      });
+      document.getElementById('filesWrap').classList.remove('hidden');
+      setStatus('', true);
+      document.getElementById('monthInfo').textContent = `PDF件数：${json.files.length}件`;
+    } else {
+      setStatus('ファイル一覧の取得に失敗しました。', false);
+    }
+  }
+
+  document.getElementById('zipBtn').addEventListener('click', async () => {
+    const ym = document.getElementById('monthSel').value;
+    if (!ym) return;
+    setStatus('ZIPを作成しています…', true);
+    const json = await postJSON({ action:'create_pdf_month_zip', adminPassword, ym });
+    if (json && json.ok && json.url) {
+      setStatus(`ZIPを作成しました。(${json.count}件 / ${prettyBytes(json.size)})`, true);
+      window.open(json.url, '_blank', 'noopener');
+    } else {
+      setStatus('ZIPの作成に失敗しました（容量超過等）。', false);
+    }
+  });
+
+  // ★ 月フォルダ削除（確認ダイアログ → 実行）
+  let pendingDeleteYm = '';
+  document.getElementById('delMonthBtn').addEventListener('click', () => {
+    const ym = document.getElementById('monthSel').value;
+    if (!ym) { setStatus('削除対象の月を選択してください。', false); return; }
+    pendingDeleteYm = ym;
+    confirmTitle.textContent = `フォルダ「${ym}」を削除しますか？`;
+    confirmModal.classList.add('show');
+  });
+  cancelDelBtn.addEventListener('click', () => {
+    confirmModal.classList.remove('show');
+    pendingDeleteYm = '';
+  });
+  confirmDelBtn.addEventListener('click', async () => {
+    if (!pendingDeleteYm) return;
+    setStatus('削除中…', true);
+    confirmModal.classList.remove('show');
+    const json = await postJSON({ action:'delete_month_folder', adminPassword, ym: pendingDeleteYm });
+    if (json && json.ok && json.trashed) {
+      setStatus(`「${pendingDeleteYm}」をゴミ箱へ移動しました（ファイル:${json.files}, サブフォルダ:${json.subfolders}）。`, true);
+      pendingDeleteYm = '';
+      await refreshMonths(); // 一覧を更新
+    } else {
+      setStatus('削除に失敗しました。権限や対象の有無をご確認ください。', false);
+    }
+  });
+
+  /* ===== パスワード変更 ===== */
+  document.getElementById('setPwBtn').addEventListener('click', async () => {
+    const newPw = document.getElementById('newPw').value.trim();
+    if (newPw.length < 6 || newPw.length > 128) { setStatus('入力用PWは6〜128文字で。', false); return; }
+    setStatus('更新中…', true);
+    const json = await postJSON({ action:'set_access_password', adminPassword, newPassword: newPw });
+    if (json && json.ok) { setStatus('入力用PWを更新しました。', true); document.getElementById('newPw').value=''; }
+    else { setStatus('入力用PWの更新に失敗しました。', false); }
+  });
+
+  document.getElementById('setAdminPwBtn').addEventListener('click', async () => {
+    const curr = document.getElementById('currAdminPw').value;
+    const next = document.getElementById('newAdminPw').value;
+    if (!curr || !next) { setStatus('現在/新しい管理PWを入力してください。', false); return; }
+    if (next.length < 10 || next.length > 128) { setStatus('新しい管理PWは10〜128文字で。', false); return; }
+    setStatus('管理PWを更新中…', true);
+    const json = await postJSON({ action:'set_admin_password', adminPassword, currentPassword: curr, newPassword: next });
+    if (json && json.ok) {
+      setStatus('管理PWを更新しました。次回ログインから新PWが必要です。', true);
+      document.getElementById('currAdminPw').value = '';
+      document.getElementById('newAdminPw').value = '';
+      adminPassword = next;
+    } else {
+      setStatus('管理PWの更新に失敗しました。', false);
+    }
+  });
+
+  /* ===== 補助 ===== */
+  function prettyBytes(n){
+    if (n == null) return '-';
+    if (n < 1024) return n + ' B';
+    const u = ['KB','MB','GB','TB']; let i = -1;
+    do { n = n/1024; i++; } while (n >= 1024 && i < u.length-1);
+    return n.toFixed(n<10?2:n<100?1:0) + ' ' + u[i];
+  }
+  function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+</script>
+</body>
+</html>
