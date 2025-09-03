@@ -4,7 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" id="vp" content="width=device-width, initial-scale=1">
 <title>管理画面｜PDF報告アプリ</title>
-<!-- Font Awesome（必要なら外してOK） -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <style>
   *,*::before,*::after{ box-sizing:border-box; }
@@ -105,7 +104,7 @@
       <p class="muted" style="margin-top:6px;">※ 通知は「ON」かつ宛先が設定されている場合のみ送信されます。</p>
     </div>
 
-    <!-- ダウンロード：履歴CSV -->
+    <!-- ダウンロード：回答履歴（CSV） -->
     <div class="card">
       <h2>ダウンロード：回答履歴（CSV）</h2>
       <button class="btn secondary" id="dlCsvBtn">回答履歴CSVをダウンロード</button>
@@ -180,7 +179,8 @@
 </div>
 
 <script>
-  const GAS_EXEC_URL = 'https://script.google.com/macros/s/XXXXXXXXXXXXXXXXXXXX/exec'; // ←差し替え
+  // ←あなたの GAS /exec を貼る
+  const GAS_EXEC_URL = 'https://script.google.com/macros/s/AKfycbzS47CaHI3OwVM_cHUx1N8eJWn_HRCzEIPfIMe_DFQXJ0r6HsgxItQPnLE1RxJ0XWU/exec';
 
   let adminPassword = '';
   const statusEl = document.getElementById('status');
@@ -203,14 +203,37 @@
 
   function setStatus(msg, ok=true){ statusEl.style.color = ok ? '#0a7f5a' : '#b91c1c'; statusEl.textContent = msg || ''; }
 
+  // ★ ここが“単純リクエスト”版 postJSON（preflight回避）
   async function postJSON(bodyObj){
-    const res = await fetch(GAS_EXEC_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
-      body: JSON.stringify(bodyObj)
-    });
-    const json = await res.json().catch(() => ({}));
-    return json;
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 15000);
+    try {
+      const res = await fetch(GAS_EXEC_URL, {
+        method: 'POST',
+        // mode: 'cors', // 省略可（付けてもOK）
+        headers: { 'Content-Type': 'text/plain' }, // ← charset なし！
+        body: JSON.stringify(bodyObj),
+        signal: ctrl.signal,
+      });
+      clearTimeout(t);
+
+      if (!res.ok) {
+        const txt = await res.text().catch(()=> '');
+        console.error('GAS non-200:', res.status, txt);
+        return { ok:false, error:`HTTP ${res.status}` };
+      }
+      // JSON以外が返ってきたときのログ
+      try { return await res.json(); }
+      catch(e){
+        const txt = await res.text().catch(()=> '(no text)');
+        console.error('JSON parse failed. response text:', txt);
+        return { ok:false, error:'Invalid JSON from GAS' };
+      }
+    } catch (err) {
+      clearTimeout(t);
+      console.error('fetch failed:', err);
+      return { ok:false, error:String(err && err.message || err) };
+    }
   }
 
   // ログイン
@@ -218,15 +241,19 @@
     const pw = document.getElementById('adminPw').value.trim();
     if (!pw) { document.getElementById('loginMsg').textContent = 'パスワードを入力してください。'; return; }
     document.getElementById('loginMsg').textContent = '認証中…';
+
     const json = await postJSON({ action:'admin_auth', adminPassword: pw });
+
     if (json && json.ok) {
       adminPassword = pw;
       loginSec.classList.add('hidden');
       panelSec.classList.remove('hidden');
       setStatus('ログインしました。', true);
+      document.getElementById('loginMsg').textContent = '';
       await initDashboard();
     } else {
       document.getElementById('loginMsg').textContent = '認証に失敗しました。';
+      setStatus(json && json.error ? `認証エラー: ${json.error}` : '認証に失敗しました。', false);
     }
   });
 
@@ -351,7 +378,7 @@
     }
   });
 
-  // ★ 月フォルダ削除（確認ダイアログ → 実行）
+  // 月フォルダ削除（確認ダイアログ → 実行）
   let pendingDeleteYm = '';
   document.getElementById('delMonthBtn').addEventListener('click', () => {
     const ym = document.getElementById('monthSel').value;
@@ -372,36 +399,9 @@
     if (json && json.ok && json.trashed) {
       setStatus(`「${pendingDeleteYm}」をゴミ箱へ移動しました（ファイル:${json.files}, サブフォルダ:${json.subfolders}）。`, true);
       pendingDeleteYm = '';
-      await refreshMonths(); // 一覧を更新
+      await refreshMonths();
     } else {
       setStatus('削除に失敗しました。権限や対象の有無をご確認ください。', false);
-    }
-  });
-
-  /* ===== パスワード変更 ===== */
-  document.getElementById('setPwBtn').addEventListener('click', async () => {
-    const newPw = document.getElementById('newPw').value.trim();
-    if (newPw.length < 6 || newPw.length > 128) { setStatus('入力用PWは6〜128文字で。', false); return; }
-    setStatus('更新中…', true);
-    const json = await postJSON({ action:'set_access_password', adminPassword, newPassword: newPw });
-    if (json && json.ok) { setStatus('入力用PWを更新しました。', true); document.getElementById('newPw').value=''; }
-    else { setStatus('入力用PWの更新に失敗しました。', false); }
-  });
-
-  document.getElementById('setAdminPwBtn').addEventListener('click', async () => {
-    const curr = document.getElementById('currAdminPw').value;
-    const next = document.getElementById('newAdminPw').value;
-    if (!curr || !next) { setStatus('現在/新しい管理PWを入力してください。', false); return; }
-    if (next.length < 10 || next.length > 128) { setStatus('新しい管理PWは10〜128文字で。', false); return; }
-    setStatus('管理PWを更新中…', true);
-    const json = await postJSON({ action:'set_admin_password', adminPassword, currentPassword: curr, newPassword: next });
-    if (json && json.ok) {
-      setStatus('管理PWを更新しました。次回ログインから新PWが必要です。', true);
-      document.getElementById('currAdminPw').value = '';
-      document.getElementById('newAdminPw').value = '';
-      adminPassword = next;
-    } else {
-      setStatus('管理PWの更新に失敗しました。', false);
     }
   });
 
